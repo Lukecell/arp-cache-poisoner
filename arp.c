@@ -226,72 +226,7 @@ out:
     return err;
 }
 
-/*
- * Creates a raw socket that listens for ARP traffic on specific ifindex.
- * Writes out the socket's FD.
- * Return 0 on success.
- */
-int bind_arp(int ifindex, int *fd)
-{
-    debug("bind_arp: ifindex=%i", ifindex);
-    int ret = -1;
 
-    // Submit request for a raw socket descriptor.
-    *fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
-    if (*fd < 1) {
-        perror("socket()");
-        goto out;
-    }
-
-    debug("Binding to ifindex %i", ifindex);
-    struct sockaddr_ll sll;
-    memset(&sll, 0, sizeof(struct sockaddr_ll));
-    sll.sll_family = AF_PACKET;
-    sll.sll_ifindex = ifindex;
-    if (bind(*fd, (struct sockaddr*) &sll, sizeof(struct sockaddr_ll)) < 0) {
-        perror("bind");
-        goto out;
-    }
-
-    ret = 0;
-out:
-	if (ret && *fd > 0) {
-		debug("Cleanup socket");
-		close(*fd);
-	}
-	return ret;
-}
-
-int bind_ip(int ifindex, int *fd)
-{
-    debug("bind_ip: ifindex=%i", ifindex);
-    int ret = -1;
-
-    // Submit request for a raw socket descriptor.
-    *fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_IP));
-    if (*fd < 1) {
-        perror("socket()");
-        goto out;
-    }
-
-    debug("Binding to ifindex %i", ifindex);
-    struct sockaddr_ll sll;
-    memset(&sll, 0, sizeof(struct sockaddr_ll));
-    sll.sll_family = AF_PACKET;
-    sll.sll_ifindex = ifindex;
-    if (bind(*fd, (struct sockaddr*) &sll, sizeof(struct sockaddr_ll)) < 0) {
-        perror("bind");
-        goto out;
-    }
-
-    ret = 0;
-out:
-    if (ret && *fd > 0) {
-        debug("Cleanup socket");
-        close(*fd);
-    }
-    return ret;
-}
 
 int bind_all(int ifindex, int *fd){
 	int ret = -1;
@@ -348,6 +283,63 @@ int read_all(int fd){
 		return parse_ip (buffer, rcv_resp);
 	}
 }
+int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
+{
+	debug("parse_arp");
+
+	printf("%d", recv_resp->h_proto);
+
+	struct arp_header *arp_resp = (struct arp_header *) (buffer + ETH2_HEADER_LEN);	
+
+	struct in_addr sender_a;
+	memset(&sender_a, 0, sizeof(struct in_addr));
+	memcpy(&sender_a.s_addr, arp_resp->sender_ip, sizeof(uint32_t));
+
+	int i = 0;
+	struct in_addr target_a;
+	memset(&target_a, 0, sizeof(struct in_addr));
+	memcpy(&target_a.s_addr, arp_resp->target_ip, sizeof(uint32_t));
+
+	printf("\nTarget IP: %s", inet_ntoa(target_a));
+	printf("\n");
+	//debug("Target IP Length: %d", target_ip_len);
+	debug("Sender IP: %s", inet_ntoa(sender_a));
+
+	debug("Sender MAC: %02X:%02X:%02X:%02X:%02X:%02X",
+		arp_resp->sender_mac[0],
+		arp_resp->sender_mac[1],
+		arp_resp->sender_mac[2],
+		arp_resp->sender_mac[3],
+		arp_resp->sender_mac[4],
+		arp_resp->sender_mac[5]);
+}
+
+int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
+{
+	debug("parse_ip");
+
+	struct iphdr *ip_resp = (struct iphdr *) (buffer + sizeof(struct ethhdr));
+
+	struct sockaddr_in source;
+	struct sockaddr_in dest;
+
+	source.sin_addr.s_addr=ip_resp->saddr; //Place the IP addresses in a struct
+	dest.sin_addr.s_addr  =ip_resp->daddr; //that can be read by inet_ntoa
+
+//	debug("ASD\n");
+
+	printf("Source IP`: %s\nDestination IP: %s", 
+			inet_ntoa(source.sin_addr), inet_ntoa(dest.sin_addr));	
+
+	if(ip_resp->protocol == PROTO_TCP)
+	{
+		parse_tcp(buffer, recv_resp, ip_resp);
+	}
+	else if(ip_resp->protocol == PROTO_UDP)
+	{
+		parse_tcp(buffer, recv_resp, ip_resp);
+	}
+}
 
 int parse_tcp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp)
 {
@@ -376,7 +368,7 @@ int test_arping(const char *ifname, const char *ip) {
     }
     int arp_fd;
 	int ip_fd;
-	int fd;
+	int fd;/*
     if (bind_arp(ifindex, &arp_fd)) {
         err("Failed to bind_arp()");
         goto out;
@@ -385,7 +377,7 @@ int test_arping(const char *ifname, const char *ip) {
 	{
 		err("Failed to bind ip()");
 		goto out;
-	}
+	}*/
 
 	if (bind_all(ifindex, &fd))
 	{
@@ -409,7 +401,7 @@ int test_arping(const char *ifname, const char *ip) {
 
         /*if(r == 1)
             send_arp(arp_fd, ifindex, mac, src, dst);//if(r != -1)*/
-            send_arp(arp_fd, ifindex, mac, src, dst);
+            send_arp(fd, ifindex, mac, src, dst);
         //sleep(2);
     }
 

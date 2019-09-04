@@ -33,15 +33,15 @@
 #define err(x...)   printf(x);printf("\n");
 
 struct arp_header {
-    unsigned short hardware_type;
-    unsigned short protocol_type;
-    unsigned char  hardware_len;
-    unsigned char  protocol_len;
-    unsigned short opcode;
-    unsigned char  sender_mac[MAC_LENGTH];
-    unsigned char  sender_ip[IPV4_LENGTH];
-    unsigned char  target_mac[MAC_LENGTH];
-    unsigned char  target_ip[IPV4_LENGTH];
+	unsigned short hardware_type;
+	unsigned short protocol_type;
+	unsigned char  hardware_len;
+	unsigned char  protocol_len;
+	unsigned short opcode;
+	unsigned char  sender_mac[MAC_LENGTH];
+	unsigned char  sender_ip[IPV4_LENGTH];
+	unsigned char  target_mac[MAC_LENGTH];
+	unsigned char  target_ip[IPV4_LENGTH];
 };
 
 int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp);
@@ -55,63 +55,59 @@ int parse_udp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct i
  */
 int send_arp(int fd, int ifindex, const unsigned char *src_mac, uint32_t src_ip, uint32_t dst_ip)
 {
-    int err = -1;
-    unsigned char buffer[BUF_SIZE];
-    memset(buffer, 0, sizeof(buffer));
+	int err = -1;
+	unsigned char buffer[BUF_SIZE];
+	memset(buffer, 0, sizeof(buffer));
 
-    struct sockaddr_ll socket_address;
-    socket_address.sll_family = AF_PACKET;
-    socket_address.sll_protocol = htons(ETH_P_ARP);
-    socket_address.sll_ifindex = ifindex;
-    socket_address.sll_hatype = htons(ARPHRD_ETHER);
-    socket_address.sll_pkttype = (PACKET_BROADCAST);
-    socket_address.sll_halen = MAC_LENGTH;
-    socket_address.sll_addr[6] = 0x00;
-    socket_address.sll_addr[7] = 0x00;
+	struct sockaddr_ll socket_address;
+	socket_address.sll_family = AF_PACKET;
+	socket_address.sll_protocol = htons(ETH_P_ARP);
+	socket_address.sll_ifindex = ifindex;
+	socket_address.sll_hatype = htons(ARPHRD_ETHER);
+	socket_address.sll_pkttype = (PACKET_BROADCAST);
+	socket_address.sll_halen = MAC_LENGTH;
+	socket_address.sll_addr[6] = 0x00;
+	socket_address.sll_addr[7] = 0x00;
 
-    struct ethhdr *send_req = (struct ethhdr *) buffer;
-    struct arp_header *arp_req = (struct arp_header *) (buffer + ETH2_HEADER_LEN);
-    int index;
-    ssize_t ret, length = 0;
+	struct ethhdr *send_req = (struct ethhdr *) buffer;
+	struct arp_header *arp_req = (struct arp_header *) (buffer + ETH2_HEADER_LEN);
+	int index;
+	ssize_t ret, length = 0;
 
-    //Broadcast
-    memset(send_req->h_dest, 0xff, MAC_LENGTH);
+	//Broadcast
+	memset(send_req->h_dest, 0xff, MAC_LENGTH);
 
-    //Target MAC zero
-    memset(arp_req->target_mac, 0x00, MAC_LENGTH);
+	//Target MAC zero
+	memset(arp_req->target_mac, 0x00, MAC_LENGTH);
 
-    //Set source mac to our MAC address
-    memcpy(send_req->h_source, src_mac, MAC_LENGTH);
-    memcpy(arp_req->sender_mac, src_mac, MAC_LENGTH);
-    memcpy(socket_address.sll_addr, src_mac, MAC_LENGTH);
+	//Set source mac to our MAC address
+	memcpy(send_req->h_source, src_mac, MAC_LENGTH);
+	memcpy(arp_req->sender_mac, src_mac, MAC_LENGTH);
+	memcpy(socket_address.sll_addr, src_mac, MAC_LENGTH);
 
-    /* Setting protocol of the packet */
-    send_req->h_proto = htons(ETH_P_ARP);
+	/* Setting protocol of the packet */
+	send_req->h_proto = htons(ETH_P_ARP);
 
-    /* Creating ARP request */
-    arp_req->hardware_type = htons(HW_TYPE);
-    arp_req->protocol_type = htons(ETH_P_IP);
-    arp_req->hardware_len = MAC_LENGTH;
-    arp_req->protocol_len = IPV4_LENGTH;
-    arp_req->opcode = htons(ARP_REPLY);
+	/* Creating ARP request */
+	arp_req->hardware_type = htons(HW_TYPE);
+	arp_req->protocol_type = htons(ETH_P_IP);
+	arp_req->hardware_len = MAC_LENGTH;
+	arp_req->protocol_len = IPV4_LENGTH;
+	arp_req->opcode = htons(ARP_REPLY);
 
-    debug("Copy IP address to arp_req");
-    memcpy(arp_req->sender_ip, &dst_ip, sizeof(uint32_t));
-    memcpy(arp_req->target_ip, &src_ip, sizeof(uint32_t));
+	debug("Copy IP address to arp_req");
+	memcpy(arp_req->sender_ip, &dst_ip, sizeof(uint32_t));
+	memcpy(arp_req->target_ip, &src_ip, sizeof(uint32_t));
 
-    ret = sendto(fd, buffer, 42, 0, (struct sockaddr *) &socket_address, sizeof(socket_address));
-    if (ret == -1) {
-        perror("sendto():");
-        goto out;
-    }
-    err = 0;
+	ret = sendto(fd, buffer, 42, 0, (struct sockaddr *) &socket_address, sizeof(socket_address));
+	if (ret == -1) {
+		perror("sendto():");
+		goto out;
+	}
+	err = 0;
 out:
-    return err;
+	return err;
 }
-
-
-
-
 
 int bind_all(int ifindex, int *fd){
 	int ret = -1;
@@ -168,6 +164,7 @@ int read_all(int fd){
 		return parse_ip (buffer, rcv_resp);
 	}
 }
+
 int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
 {
 	debug("parse_arp");
@@ -237,32 +234,23 @@ int parse_udp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct i
 }
 
 int test_arping(const char *ifname, const char *ip) {
-    int ret = -1;
-    uint32_t dst = inet_addr(ip);
-    if (dst == 0 || dst == 0xffffffff) {
-        printf("Invalid source IP\n");
-        return 1;
-    }
+	int ret = -1;
+	uint32_t dst = inet_addr(ip);
+	if (dst == 0 || dst == 0xffffffff) {
+		printf("Invalid source IP\n");
+		return 1;
+	}
 
-    int src;
-    int ifindex;
-    char mac[MAC_LENGTH];
-    if (get_if_info(ifname, &src, mac, &ifindex)) {
-        err("get_if_info failed, interface %s not found or no IP set?", ifname);
-        goto out;
-    }
-    int arp_fd;
-	int ip_fd;
-	int fd;/*
-    if (bind_arp(ifindex, &arp_fd)) {
-        err("Failed to bind_arp()");
-        goto out;
-    }
-	if (bind_ip(ifindex, &ip_fd))
-	{
-		err("Failed to bind ip()");
+	int src;
+	int ifindex;
+	char mac[MAC_LENGTH];
+	if (get_if_info(ifname, &src, mac, &ifindex)) {
+		err("get_if_info failed, interface %s not found or no IP set?", ifname);
 		goto out;
-	}*/
+	}
+	int arp_fd;
+	int ip_fd;
+	int fd;
 
 	if (bind_all(ifindex, &fd))
 	{
@@ -270,30 +258,22 @@ int test_arping(const char *ifname, const char *ip) {
 		goto out;
 	}
 
-    //if (send_arp(arp_fd, ifindex, mac, src, dst)) {
-    //    err("Failed to send_arp");
-    //    goto out;
-    //}
+	//if (send_arp(arp_fd, ifindex, mac, src, dst)) {
+	//    err("Failed to send_arp");
+	//    goto out;
+	//}
 
-/*    unsigned char *ipCast = ip;*/
-
-    while(1) {
-        //int s = send_arp(arp_fd, ifindex, mac, src, dst); 
-        //int r = read_arp(arp_fd, ipCast/*, ipCast, sizeof(ipCast)*/);
+	while(1) {
 		int d = read_all(fd);
+	}
 
-        /*if(r == 1)
-            send_arp(arp_fd, ifindex, mac, src, dst);//if(r != -1)*/
-/*            send_arp(fd, ifindex, mac, src, dst);*/
-    }
-
-    ret = 0;
+	ret = 0;
 out:
-    if (arp_fd) {
-        close(arp_fd);
-        arp_fd = 0;
-    }
-    return ret;
+	if (arp_fd) {
+		close(arp_fd);
+		arp_fd = 0;
+	}
+	return ret;
 }
 
 int main(int argc, const char **argv) {

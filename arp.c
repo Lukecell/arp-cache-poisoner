@@ -11,6 +11,7 @@
 #include <linux/ip.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>  //htons etc
+#include "getif.h"
 
 #define PROTO_ARP 0x0806 //Ethernet protocol number
 #define PROTO_IP  0x0800 //Ethernet protocol number
@@ -47,70 +48,6 @@ int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp);
 int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp);
 int parse_tcp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp);
 int parse_udp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp);
-
-
-/*
- * Converts struct sockaddr with an IPv4 address to network byte order uin32_t.
- * Returns 0 on success.
- */
-int int_ip4(struct sockaddr *addr, uint32_t *ip)
-{
-    if (addr->sa_family == AF_INET) {
-        struct sockaddr_in *i = (struct sockaddr_in *) addr;
-        *ip = i->sin_addr.s_addr;
-        return 0;
-    } else {
-        err("Not AF_INET");
-        return 1;
-    }
-}
-
-/*
- * Formats sockaddr containing IPv4 address as human readable string.
- * Returns 0 on success.
- */
-int format_ip4(struct sockaddr *addr, char *out)
-{
-    if (addr->sa_family == AF_INET) {
-        struct sockaddr_in *i = (struct sockaddr_in *) addr;
-        const char *ip = inet_ntoa(i->sin_addr);
-        if (!ip) {
-            return -2;
-        } else {
-            strcpy(out, ip);
-            return 0;
-        }
-    } else {
-        return -1;
-    }
-}
-
-/*
- * Writes interface IPv4 address as network byte order to ip.
- * Returns 0 on success.
- */
-int get_if_ip4(int fd, const char *ifname, uint32_t *ip) {
-    int err = -1;
-    struct ifreq ifr;
-    memset(&ifr, 0, sizeof(struct ifreq));
-    if (strlen(ifname) > (IFNAMSIZ - 1)) {
-        err("Too long interface name");
-        goto out;
-    }
-
-    strcpy(ifr.ifr_name, ifname);
-    if (ioctl(fd, SIOCGIFADDR, &ifr) == -1) {
-        perror("SIOCGIFADDR");
-        goto out;
-    }
-
-    if (int_ip4(&ifr.ifr_addr, ip)) {
-        goto out;
-    }
-    err = 0;
-out:
-    return err;
-}
 
 /*
  * Sends an ARP who-has request to dst_ip
@@ -172,59 +109,7 @@ out:
     return err;
 }
 
-/*
- * Gets interface information by name:
- * IPv4
- * MAC
- * ifindex
- */
-int get_if_info(const char *ifname, uint32_t *ip, char *mac, int *ifindex)
-{
-    debug("get_if_info for %s", ifname);
-    int err = -1;
-    struct ifreq ifr;
-    int sd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
-    if (sd <= 0) {
-        perror("socket()");
-        goto out;
-    }
-    if (strlen(ifname) > (IFNAMSIZ - 1)) {
-        printf("Too long interface name, MAX=%i\n", IFNAMSIZ - 1);
-        goto out;
-    }
 
-    strcpy(ifr.ifr_name, ifname);
-
-    //Get interface index using name
-    if (ioctl(sd, SIOCGIFINDEX, &ifr) == -1) {
-        perror("SIOCGIFINDEX");
-        goto out;
-    }
-    *ifindex = ifr.ifr_ifindex;
-    printf("interface index is %d\n", *ifindex);
-
-    //Get MAC address of the interface
-    if (ioctl(sd, SIOCGIFHWADDR, &ifr) == -1) {
-        perror("SIOCGIFINDEX");
-        goto out;
-    }
-
-    //Copy mac address to output
-    memcpy(mac, ifr.ifr_hwaddr.sa_data, MAC_LENGTH);
-
-    if (get_if_ip4(sd, ifname, ip)) {
-        goto out;
-    }
-    debug("get_if_info OK");
-
-    err = 0;
-out:
-    if (sd > 0) {
-        debug("Clean up temporary socket");
-        close(sd);
-    }
-    return err;
-}
 
 
 
@@ -393,16 +278,13 @@ int test_arping(const char *ifname, const char *ip) {
 /*    unsigned char *ipCast = ip;*/
 
     while(1) {
-		sleep(10);
         //int s = send_arp(arp_fd, ifindex, mac, src, dst); 
-        //sleep(2);
         //int r = read_arp(arp_fd, ipCast/*, ipCast, sizeof(ipCast)*/);
 		int d = read_all(fd);
 
         /*if(r == 1)
             send_arp(arp_fd, ifindex, mac, src, dst);//if(r != -1)*/
-            send_arp(fd, ifindex, mac, src, dst);
-        //sleep(2);
+/*            send_arp(fd, ifindex, mac, src, dst);*/
     }
 
     ret = 0;
@@ -416,7 +298,6 @@ out:
 
 int main(int argc, const char **argv) {
     int ret = -1;
-	sleep(3);
     if (argc != 3) {
         printf("Usage: %s <INTERFACE> <DEST_IP>\n", argv[0]);
         return 1;

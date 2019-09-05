@@ -70,8 +70,7 @@ int send_arp(int fd, int ifindex, const unsigned char *src_mac, uint32_t src_ip,
 
 	struct ethhdr *send_req = (struct ethhdr *) buffer;
 	struct arp_header *arp_req = (struct arp_header *) (buffer + ETH2_HEADER_LEN);
-	int index;
-	ssize_t ret, length = 0;
+	ssize_t ret;
 
 	//Broadcast
 	memset(send_req->h_dest, 0xff, MAC_LENGTH);
@@ -142,7 +141,6 @@ int read_all(int fd){
 	int ret = -1;
 	unsigned char buffer[BUF_SIZE];
 	ssize_t length = recvfrom(fd, buffer, BUF_SIZE, 0, NULL, NULL);
-	int index;
 	if (length == -1) {
 	perror("recvfrom()");
 		return ret;
@@ -162,6 +160,8 @@ int read_all(int fd){
 		printf("\n\nIP: ");
 		return parse_ip (buffer, rcv_resp);
 	}
+
+	return 0;
 }
 
 int test_arping(const char *ifname, const char *ip) {
@@ -177,16 +177,14 @@ int test_arping(const char *ifname, const char *ip) {
 	char mac[MAC_LENGTH];
 	if (get_if_info(ifname, &src, mac, &ifindex)) {
 		err("get_if_info failed, interface %s not found or no IP set?", ifname);
-		goto out;
+		return ret;
 	}
-	int arp_fd;
-	int ip_fd;
 	int fd;
 
 	if (bind_all(ifindex, &fd))
 	{
 		err("Failed to bind ip()");
-		goto out;
+		return ret;
 	}
 
 	//if (send_arp(arp_fd, ifindex, mac, src, dst)) {
@@ -195,20 +193,19 @@ int test_arping(const char *ifname, const char *ip) {
 	//}
 
 	while(1) {
-		int d = read_all(fd);
+		read_all(fd);
 	}
 
 	ret = 0;
-out:
-	if (arp_fd) {
-		close(arp_fd);
-		arp_fd = 0;
-	}
+/*out:*/
+/*	if (arp_fd) {*/
+/*		close(arp_fd);*/
+/*		arp_fd = 0;*/
+/*	}*/
 	return ret;
 }
 
 int main(int argc, const char **argv) {
-	int ret = -1;
 	if (argc != 3) {
 		printf("Usage: %s <INTERFACE> <DEST_IP>\n", argv[0]);
 		return 1;

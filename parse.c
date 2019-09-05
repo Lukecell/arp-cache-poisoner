@@ -46,7 +46,6 @@ int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
 	memset(&sender_a, 0, sizeof(struct in_addr));
 	memcpy(&sender_a.s_addr, arp_resp->sender_ip, sizeof(uint32_t));
 
-	int i = 0;
 	struct in_addr target_a;
 	memset(&target_a, 0, sizeof(struct in_addr));
 	memcpy(&target_a.s_addr, arp_resp->target_ip, sizeof(uint32_t));
@@ -63,6 +62,8 @@ int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
 		arp_resp->sender_mac[3],
 		arp_resp->sender_mac[4],
 		arp_resp->sender_mac[5]);
+
+	return 1;
 }
 
 int parse_tcp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp)
@@ -73,6 +74,8 @@ int parse_tcp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct i
 	printf("\nDestination Port: %hu\n", ntohs(tcp_resp->dest));
 
 	//printf("\nSource Port: %d\nDestination Port: %d\n\n", );
+
+	return 1;
 }
 
 int parse_udp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp)
@@ -81,6 +84,8 @@ int parse_udp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct i
 
 	printf("\nSource Port: %hu", ntohs(udp_resp->source));
 	printf("\nDestination Port: %hu\n\n", ntohs(udp_resp->dest));
+
+	return 1;
 }
 
 int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
@@ -113,4 +118,6 @@ int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
 	{
 		parse_udp(buffer, recv_resp, ip_resp);
 	}
+
+	return 1;
 }

@@ -1,24 +1,3 @@
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <asm/types.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <linux/if_packet.h>
-#include <linux/if_ether.h>
-#include <linux/if_arp.h>
-#include <linux/ip.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>  //htons etc
-#include "getif.h"
-
-#define PROTO_ARP 0x0806 //Ethernet protocol number
-#define PROTO_IP  0x0800 //Ethernet protocol number
-
-#define PROTO_TCP 0x06   //Internet Protocol number
-#define PROTO_UDP 0x11   //Internet Protocol number
-
 #define ETH2_HEADER_LEN 14
 #define HW_TYPE         1
 #define MAC_LENGTH      6
@@ -26,11 +5,6 @@
 #define ARP_REQUEST     0x01
 #define ARP_REPLY       0x02
 #define BUF_SIZE        60
-
-#define debug(x...) printf(x);printf("\n");
-#define info(x...)  printf(x);printf("\n");
-#define warn(x...)  printf(x);printf("\n");
-#define err(x...)   printf(x);printf("\n");
 
 struct arp_header {
 	unsigned short hardware_type;
@@ -43,6 +17,31 @@ struct arp_header {
 	unsigned char  target_mac[MAC_LENGTH];
 	unsigned char  target_ip[IPV4_LENGTH];
 };
+
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <asm/types.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <linux/if_packet.h>
+#include <linux/if_ether.h>
+#include <linux/if_arp.h>
+#include <linux/ip.h>
+#include <linux/udp.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>  //htons etc
+#include "getif.h"
+#include "parse.h"
+
+
+#define debug(x...) printf(x);printf("\n");
+#define info(x...)  printf(x);printf("\n");
+#define warn(x...)  printf(x);printf("\n");
+#define err(x...)   printf(x);printf("\n");
+
+/**/
 
 int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp);
 int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp);
@@ -152,85 +151,17 @@ int read_all(int fd){
 
 /*	printf("\nProtocol: %hu\n", rcv_resp->h_proto);*/
 
-	if(rcv_resp->h_proto == 1544)
+	if(ntohs(rcv_resp->h_proto) == 2054)
 	{
 		printf("\nARP: ");
 		//printf("\nPROTO_ARP\n");
 		return parse_arp(buffer, rcv_resp);
 	}
-	else if(rcv_resp->h_proto == 8)
+	else if(ntohs(rcv_resp->h_proto) == 2048)
 	{
-		printf("\nIP: ");
+		printf("\n\nIP: ");
 		return parse_ip (buffer, rcv_resp);
 	}
-}
-
-int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
-{
-	debug("parse_arp");
-
-	printf("%d", recv_resp->h_proto);
-
-	struct arp_header *arp_resp = (struct arp_header *) (buffer + ETH2_HEADER_LEN);	
-
-	struct in_addr sender_a;
-	memset(&sender_a, 0, sizeof(struct in_addr));
-	memcpy(&sender_a.s_addr, arp_resp->sender_ip, sizeof(uint32_t));
-
-	int i = 0;
-	struct in_addr target_a;
-	memset(&target_a, 0, sizeof(struct in_addr));
-	memcpy(&target_a.s_addr, arp_resp->target_ip, sizeof(uint32_t));
-
-	printf("\nTarget IP: %s", inet_ntoa(target_a));
-	printf("\n");
-	//debug("Target IP Length: %d", target_ip_len);
-	debug("Sender IP: %s", inet_ntoa(sender_a));
-
-	debug("Sender MAC: %02X:%02X:%02X:%02X:%02X:%02X",
-		arp_resp->sender_mac[0],
-		arp_resp->sender_mac[1],
-		arp_resp->sender_mac[2],
-		arp_resp->sender_mac[3],
-		arp_resp->sender_mac[4],
-		arp_resp->sender_mac[5]);
-}
-
-int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
-{
-	debug("parse_ip");
-
-	struct iphdr *ip_resp = (struct iphdr *) (buffer + sizeof(struct ethhdr));
-
-	struct sockaddr_in source;
-	struct sockaddr_in dest;
-
-	source.sin_addr.s_addr=ip_resp->saddr; //Place the IP addresses in a struct
-	dest.sin_addr.s_addr  =ip_resp->daddr; //that can be read by inet_ntoa
-
-//	debug("ASD\n");
-
-	printf("Source IP`: %s\nDestination IP: %s", 
-			inet_ntoa(source.sin_addr), inet_ntoa(dest.sin_addr));	
-
-	if(ip_resp->protocol == PROTO_TCP)
-	{
-		parse_tcp(buffer, recv_resp, ip_resp);
-	}
-	else if(ip_resp->protocol == PROTO_UDP)
-	{
-		parse_tcp(buffer, recv_resp, ip_resp);
-	}
-}
-
-int parse_tcp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp)
-{
-	debug("parse_tcp");
-}
-
-int parse_udp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp)
-{
-	debug("parse_udp");
 }
 
 int test_arping(const char *ifname, const char *ip) {
@@ -277,12 +208,12 @@ out:
 }
 
 int main(int argc, const char **argv) {
-    int ret = -1;
-    if (argc != 3) {
-        printf("Usage: %s <INTERFACE> <DEST_IP>\n", argv[0]);
-        return 1;
-    }
-    const char *ifname = argv[1];
-    const char *ip = argv[2];
-    return test_arping(ifname, ip);
+	int ret = -1;
+	if (argc != 3) {
+		printf("Usage: %s <INTERFACE> <DEST_IP>\n", argv[0]);
+		return 1;
+	}
+	const char *ifname = argv[1];
+	const char *ip = argv[2];
+	return test_arping(ifname, ip);
 }

@@ -153,15 +153,15 @@ int read_all(int fd){
 	{
 		printf("\nARP: ");
 		//printf("\nPROTO_ARP\n");
-		return parse_arp(buffer, rcv_resp);
+		ret = parse_arp(buffer, rcv_resp);
 	}
 	else if(ntohs(rcv_resp->h_proto) == 2048)
 	{
 		printf("\n\nIP: ");
-		return parse_ip (buffer, rcv_resp);
+		ret = parse_ip (buffer, rcv_resp);
 	}
 
-	return 0;
+	return -1;
 }
 
 int test_arping(const char *ifname, const char *ip) {

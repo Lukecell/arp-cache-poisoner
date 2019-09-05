@@ -63,7 +63,7 @@ int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
 		arp_resp->sender_mac[4],
 		arp_resp->sender_mac[5]);
 
-	return 1;
+	return 0; //Instructs parent function to send ARP packet
 }
 
 int parse_tcp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp)
@@ -85,7 +85,7 @@ int parse_udp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct i
 	printf("\nSource Port: %hu", ntohs(udp_resp->source));
 	printf("\nDestination Port: %hu\n\n", ntohs(udp_resp->dest));
 
-	return 1;
+	return 0;
 }
 
 int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
@@ -93,11 +93,6 @@ int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp)
 	//debug("parse_ip");
 
 	struct iphdr *ip_resp = (struct iphdr *) (buffer + sizeof(struct ethhdr));
-
-	if(ip_resp->protocol == PROTO_TCP)
-	{
-		return 0; //parse_tcp(buffer, recv_resp, ip_resp);
-	}
 
 	struct sockaddr_in source;
 	struct sockaddr_in dest;

@@ -4,9 +4,9 @@
 #define IPV4_LENGTH     4
 #define ARP_REQUEST     0x01
 #define ARP_REPLY       0x02
-#define BUF_SIZE        60
+#define BUF_SIZE        64000 //Maximum TCP packet size, roughly equal to 64 kilobytes
 
-struct arp_header {
+/*struct arp_header {
 	unsigned short hardware_type;
 	unsigned short protocol_type;
 	unsigned char  hardware_len;
@@ -16,7 +16,7 @@ struct arp_header {
 	unsigned char  sender_ip[IPV4_LENGTH];
 	unsigned char  target_mac[MAC_LENGTH];
 	unsigned char  target_ip[IPV4_LENGTH];
-};
+};*/
 
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -36,17 +36,20 @@ struct arp_header {
 #include "parse.h"
 
 
+/*
+	struct sockaddr_in sock; 
+
+	sock.sin_family = AF_INET; //Used for ipv4
+	
+	sock.sin_port = htons(destPort); //Given by parseTCP/UDP
+	
+	inet_pton(AF_INET, inet_ntoa(source.sin_addr), &sock.sin_addr);
+*/
+
 #define debug(x...) printf(x);printf("\n");
 #define info(x...)  printf(x);printf("\n");
 #define warn(x...)  printf(x);printf("\n");
 #define err(x...)   printf(x);printf("\n");
-
-/**/
-
-int parse_arp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp);
-int parse_ip(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp);
-int parse_tcp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp);
-int parse_udp(unsigned char buffer[BUF_SIZE], struct ethhdr *recv_resp, struct iphdr *ip_resp);
 
 /*
  * Sends an ARP who-has request to dst_ip
@@ -67,6 +70,13 @@ int send_arp(int fd, int ifindex, const unsigned char *src_mac, uint32_t src_ip,
 	socket_address.sll_halen = MAC_LENGTH;
 	socket_address.sll_addr[6] = 0x00;
 	socket_address.sll_addr[7] = 0x00;
+
+	/*
+	*	struct sockaddr_ll sock_addr
+	*	sock_addr.sll_ifindex = ifindex; //Concerned about this line, insure ifindex is available
+	*	sock_addr.sll_halen  = ETH_ALEN;
+
+	*/
 
 	struct ethhdr *send_req = (struct ethhdr *) buffer;
 	struct arp_header *arp_req = (struct arp_header *) (buffer + ETH2_HEADER_LEN);
@@ -107,8 +117,11 @@ out:
 	return err;
 }
 
+
+
 int bind_all(int ifindex, int *fd){
 	int ret = -1;
+	struct output out;
 	*fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (*fd < 1) {
 		perror("socket()");
@@ -152,13 +165,23 @@ int read_all(int fd){
 	if(ntohs(rcv_resp->h_proto) == 2054)
 	{
 		printf("\nARP: ");
-		//printf("\nPROTO_ARP\n");
-		ret = parse_arp(buffer, rcv_resp);
+		parse_arp(buffer, rcv_resp);
+
+		return 1;
+
+		//TODO: Detect if ARP packet originates from the victim. If it is, send our own invalidating gratuitous arp message
 	}
 	else if(ntohs(rcv_resp->h_proto) == 2048)
 	{
-		printf("\n\nIP: ");
-		ret = parse_ip (buffer, rcv_resp);
+		//printf("\n\nIP: ");
+		//struct sockaddr_in sock = parse_ip (buffer, rcv_resp);
+
+		//sendto(fd, buffer, 5000, 0, (struct sockaddr *) &sock, sizeof(sock));
+
+		return 2;
+
+		//TODO: First, determine if packet is directed to the user of the MitM tool, 
+		//if it isn't craft a sockaddr struct, use the already bound struct, and send a mesage using sendto()
 	}
 
 	return -1;
@@ -187,23 +210,27 @@ int test_arping(const char *ifname, const char *ip) {
 		return ret;
 	}
 
-	//if (send_arp(arp_fd, ifindex, mac, src, dst)) {
-	//    err("Failed to send_arp");
-	//    goto out;
-	//}
+	if (send_arp(fd, ifindex, mac, src, dst)) {
+	    err("Failed to send_arp");
+	    return 0;
+	}
 
 	while(1) {
-		read_all(fd);
+		if( read_all(fd) == 1) send_arp(fd, ifindex, mac, src, dst);
 	}
 
 	ret = 0;
-/*out:*/
-/*	if (arp_fd) {*/
-/*		close(arp_fd);*/
-/*		arp_fd = 0;*/
-/*	}*/
+
 	return ret;
 }
+
+/*
+ *	struct sockaddr_in si_other = {0};
+ *
+ *	si_other.sin_family = AF_PACKET
+ *  si_other.sin_port = 
+ *	
+*/
 
 int main(int argc, const char **argv) {
 	if (argc != 3) {
